@@ -2,6 +2,7 @@ package kq
 
 import (
 	"context"
+	"github.com/segmentio/kafka-go/sasl/plain"
 	"strconv"
 	"time"
 
@@ -49,7 +50,18 @@ func NewPusher(addrs []string, topic string, opts ...PushOption) *Pusher {
 	return pusher
 }
 
-func NewPusherWithTransport(addrs []string, topic string, sharedTransport *kafka.Transport, opts ...PushOption) *Pusher {
+func NewPusherWithTransport(addrs []string, topic string, username string, password string, opts ...PushOption) *Pusher {
+	mechanism := plain.Mechanism{
+		Username: username,
+		Password: password,
+	}
+
+	// Transports are responsible for managing connection pools and other resources,
+	// it's generally best to create a few of these and share them across your
+	// application.
+	sharedTransport := &kafka.Transport{
+		SASL: mechanism,
+	}
 	mProducer := &kafka.Writer{
 		Addr:        kafka.TCP(addrs...),
 		Topic:       topic,

@@ -26,16 +26,27 @@ type (
 	}
 )
 
-func NewPusher(addrs []string, topic string, opts ...PushOption) *Pusher {
+func NewPusherWithKqConf(c KqConf, opts ...PushOption) *Pusher {
+
 	mProducer := &kafka.Writer{
-		Addr:        kafka.TCP(addrs...),
-		Topic:       topic,
+		Addr:        kafka.TCP(c.Brokers...),
+		Topic:       c.Topic,
 		Balancer:    &kafka.LeastBytes{},
 		Compression: kafka.Snappy,
 	}
+
+	//添加SASL验证
+	if len(c.Username) > 0 && len(c.Password) > 0 {
+		mProducer.Transport = &kafka.Transport{
+			SASL: plain.Mechanism{
+				Username: c.Username,
+				Password: c.Password,
+			},
+		}
+	}
 	pusher := &Pusher{
 		producer: mProducer,
-		topic:    topic,
+		topic:    c.Topic,
 	}
 	pusher.executor = executors.NewChunkExecutor(func(tasks []interface{}) {
 		chunk := make([]kafka.Message, len(tasks))
@@ -50,23 +61,11 @@ func NewPusher(addrs []string, topic string, opts ...PushOption) *Pusher {
 	return pusher
 }
 
-func NewPusherWithTransport(addrs []string, topic string, username string, password string, opts ...PushOption) *Pusher {
-	mechanism := plain.Mechanism{
-		Username: username,
-		Password: password,
-	}
-
-	// Transports are responsible for managing connection pools and other resources,
-	// it's generally best to create a few of these and share them across your
-	// application.
-	sharedTransport := &kafka.Transport{
-		SASL: mechanism,
-	}
+func NewPusher(addrs []string, topic string, opts ...PushOption) *Pusher {
 	mProducer := &kafka.Writer{
 		Addr:        kafka.TCP(addrs...),
 		Topic:       topic,
 		Balancer:    &kafka.LeastBytes{},
-		Transport:   sharedTransport,
 		Compression: kafka.Snappy,
 	}
 	pusher := &Pusher{
